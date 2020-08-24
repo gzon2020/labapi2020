@@ -6,7 +6,7 @@ const cors = require("cors");
 //const bcrypt = require('bcrypt');
 const bcrypt = require('bcryptjs');
 const bodyParser = require('body-parser')
-
+const util =require('util');
 const app = express();
 const corsOptions = {};
 app.use(cors(corsOptions));
@@ -25,32 +25,38 @@ router.get('/', (req, res) => {
   });
 
 router.post('/registration', cors(corsOptions), (req, res) => {
-  const saltRounds = 10000
-  bcrypt.genSalt(saltRounds, (err, getsalt) => {
-      bcrypt.hash(req.body.password, getsalt, (err, gethash) => {
-          salt = getsalt
-          hash = gethash
-          // res.send('ok : ' + req.body.email + ', ' + req.body.password + ' Salt : ' + salt + ' Hash : ' + hash)
-          let sql = "INSERT INTO  members (username,password,loginname,hash,salt,member_id) values ('"+req.body.username+"','" + 
-          req.body.password + "','" + req.body.loginname + "','" + hash + "','" + salt + "','"+req.body.member_id+"')"
-          db.query(sql, (err, results) => { // สั่ง Query คำสั่ง sql
-              console.log(results) // แสดงผล บน Console 
-              if (err) {                  
-                  res.json({ results: 'error' })
-              } else {
-                  res.json({ results: 'success' })                 
-              }
-          })
-      })
+    let  loginname = req.body.firstname+" "+req.body.lastname;
+  let allmember ="SELECT COUNT(members.username) as member FROM members";
+  db.query(allmember, (err, row) => {
+let = rows= row[0].member+1;
+let digi=rows.toString().padStart(3, "0");
+let pass = req.body.password;
+bcrypt.genSalt(10, function(err, salt) {
+    bcrypt.hash(req.body.password.trim(), salt, function(err, hash) {
+        console.log(hash)
+        let sql = `INSERT INTO  members (username,password,loginname,hash,salt,member_id,email,phone,zipcode,address,provinces,amphures,districts) values ('${req.body.username}','${pass}','${loginname}','${hash}','','JTUKTA${digi}','${req.body.email}','${req.body.phone}','${req.body.zipcode}','${req.body.address}','${req.body.provinces}','${req.body.amphures}','${req.body.districts}')`
+        db.query(sql, (err, results) => { // สั่ง Query คำสั่ง sql
+            console.log(results) // แสดงผล บน Console 
+            if (err) {                  
+                res.json({ results: 'error' })
+            } else {
+                res.json({ results: 'success' })                 
+            }
+        })
+    });
   })
-  bcrypt.compare()
+  })
+  /*
+  
+ */
 })
 router.post('/userlogin', cors(corsOptions), (req, res) => {
-  let sql = `SELECT username,loginname,hash ,member_id From   members WHERE username = '${req.body.User_ID}'`
-  
+  let sql = `SELECT username,loginname,hash ,member_id ,membertype From   members WHERE username = '${req.body.User_ID}'`
   let obj = {}
+  console.log(req.body);
   // values ('541335','" + req.body.password + "','" + req.body.email + "','" + hash + "','" + salt + "')"
   db.query(sql, (err, results) => {
+      console.log(results.length)
       if (err)
           console.log(err)
       if (results.length === 0) {
@@ -58,28 +64,25 @@ router.post('/userlogin', cors(corsOptions), (req, res) => {
           res.json({ 'results': 'email empty' })
       } else {
           obj = results[0]
-          bcrypt.compare(req.body.Pass_ID, obj.hash, (err, result) => {
-              if (result) {
-                  // ถ้า result == true รหัสผ่านตรง
-                  // res.send('ยินดีด้วยคุณลงชื่อเข้าใช้งานได้แล้ว')
-                  res.json({ 'results': 'success', 'datarow': obj })
-                  //TODO: เก็บข้อมูลผู้ใช้ไว้บน session
-              }
-              else {               
-                  res.json({ 'results': 'error'})
-              }
-          })
+        //  console.log(obj.hash)
+          bcrypt.compare(req.body.Pass_ID, obj.hash, function(err, rs) {
+             // console.log(rs);
+            if(rs===true){
+                res.json({ 'results': 'success', 'datarow': obj })
+            }else{
+                res.json({ 'results': 'error'})
+            }
+        });       
       }
 
-  })
+  }) 
 })
 router.post('/ckeckzipcode', cors(corsOptions), (req, res) => {
     var zipcode = req.body.zipcode;
     let sql = `SELECT districts.id as id, districts.zip_code as zipcode , districts.name_th as name, districts.name_en as enname, districts.amphure_id as amphureid FROM districts WHERE   districts.zip_code='${zipcode}'`
-    let sql2=`SELECT DISTINCT (amphures.name_th) as amphures FROM districts Right Join amphures ON districts.amphure_id = amphures.id WHERE districts.zip_code = '${zipcode}'`
+    let sql2=`SELECT DISTINCT (amphures.name_th) as amphures ,amphures.id FROM districts Right Join amphures ON districts.amphure_id = amphures.id WHERE districts.zip_code = '${zipcode}'`
     let sql3 =`SELECT DISTINCT (provinces.name_th) as provinces FROM districts Left Join amphures ON districts.amphure_id = amphures.id Left Join provinces ON amphures.province_id = provinces.id WHERE districts.zip_code = '${zipcode}'`
-    let obj = {}
-    
+    let obj = {}   
     db.query(sql, (err, rs1) => {
         if (err)
             console.log(err)
